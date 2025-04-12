@@ -2,13 +2,18 @@ from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from models import Mood, db
 from datetime import datetime, timedelta
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 mood_bp = Blueprint('mood', __name__)
 
-@mood_bp.route('/', methods=['POST'])
+@mood_bp.route('/', methods=['POST'], strict_slashes=False)
 @login_required
 def add_mood():
+    logging.debug("POST /api/mood called")
     data = request.get_json()
+    logging.debug(f"Request data: {data}")
     
     # Validate mood score
     score = data.get('score')
@@ -31,7 +36,7 @@ def add_mood():
         db.session.rollback()
         return jsonify({'message': f'Error: {str(e)}'}), 500
 
-@mood_bp.route('/', methods=['GET'])
+@mood_bp.route('/', methods=['GET'], strict_slashes=False)
 @login_required
 def get_moods():
     try:

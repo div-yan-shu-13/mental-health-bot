@@ -1,4 +1,5 @@
 from flask import Flask, session
+from flask_migrate import Migrate
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
@@ -30,9 +31,10 @@ def create_app():
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True  # Important for cookies
     }})
-    
+
     # Initialize extensions with app
     db.init_app(app)
+    migrate = Migrate(app, db)   
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
     
@@ -57,6 +59,15 @@ def create_app():
     @app.route('/api/health')
     def health():
         return {'status': 'ok'}
+    
+    @app.route('/api/mood', methods=['OPTIONS'])
+    @app.route('/api/mood/insights', methods=['OPTIONS'])
+    def handle_mood_options():
+        response = app.make_default_options_response()
+        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
     
     return app
 

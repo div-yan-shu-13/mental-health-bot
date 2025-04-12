@@ -20,7 +20,7 @@ const MoodTrackerPage = () => {
         setError('');
       } catch (err) {
         setError('Failed to load mood entries');
-        console.error(err);
+        console.error('Error fetching moods:', err.response || err.message);
       } finally {
         setLoading(false);
       }
