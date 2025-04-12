@@ -6,6 +6,8 @@ from flask_login import LoginManager
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
+from flask import jsonify
+from flask_login import login_required
 
 # Load environment variables
 load_dotenv()
@@ -68,6 +70,26 @@ def create_app():
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         return response
+
+    @app.route('/api/self_care_tips', methods=['GET'])
+    @login_required
+    def get_self_care_tips():
+        """Return a list of self-care tips"""
+        tips = [
+            "Try 4-7-8 breathing: Inhale for 4 counts, hold for 7, exhale for 8.",
+            "Take 30 seconds to write down one thing you're grateful for today.",
+            "Stand up and stretch for 2 minutes to boost your mood and energy.",
+            "Focus on your five senses - notice 5 things you can see, 4 you can touch, 3 you can hear, 2 you can smell, and 1 you can taste.",
+            "Speak to yourself today as you would to a good friend.",
+            "Drink a glass of water - dehydration can affect your mood.",
+            "Set a small, achievable goal for today.",
+            "Listen to a song that makes you feel good.",
+            "Text someone you care about.",
+            "Spend 5 minutes in nature or looking out a window."
+        ]
+    
+        # Get a random tip or return all tips
+        return jsonify({"tips": tips})
     
     return app
 

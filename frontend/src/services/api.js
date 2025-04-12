@@ -44,4 +44,8 @@ export const chatbotService = {
     api.post('/chatbot/chat', { message }),
 };
 
+export const selfCareService = {
+  getTips: () => api.get('/self_care_tips'),
+};
+
 export default api;

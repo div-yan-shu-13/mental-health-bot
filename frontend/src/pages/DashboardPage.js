@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { moodService } from '../services/api';
+import { moodService, selfCareService } from '../services/api';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -27,19 +27,23 @@ ChartJS.register(
 const DashboardPage = () => {
   const [moods, setMoods] = useState([]);
   const [insights, setInsights] = useState(null);
+  const [tips, setTips] = useState([]);
+  const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [moodsResponse, insightsResponse] = await Promise.all([
+        const [moodsResponse, insightsResponse, tipsResponse] = await Promise.all([
           moodService.getMoods(),
-          moodService.getInsights()
+          moodService.getInsights(),
+          selfCareService.getTips()
         ]);
         
         setMoods(moodsResponse.data);
         setInsights(insightsResponse.data);
+        setTips(tipsResponse.data.tips);
         setError('');
       } catch (err) {
         setError('Failed to load dashboard data');
@@ -51,6 +55,17 @@ const DashboardPage = () => {
 
     fetchData();
   }, []);
+
+  // Change tip every 10 seconds
+  useEffect(() => {
+    if (tips.length === 0) return;
+    
+    const interval = setInterval(() => {
+      setCurrentTipIndex(prevIndex => (prevIndex + 1) % tips.length);
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, [tips]);
 
   // Prepare chart data
   const chartData = {
@@ -67,6 +82,10 @@ const DashboardPage = () => {
         tension: 0.1
       }
     ]
+  };
+
+  const handleNextTip = () => {
+    setCurrentTipIndex(prevIndex => (prevIndex + 1) % tips.length);
   };
 
   if (loading) {
@@ -86,6 +105,21 @@ const DashboardPage = () => {
             <Line data={chartData} />
           ) : (
             <p>No mood data available yet. Start tracking your mood!</p>
+          )}
+        </div>
+        
+        <div className="self-care-container">
+          <h2>Self-Care Corner</h2>
+          {tips.length > 0 ? (
+            <div className="tip-card">
+              <div className="tip-icon">💧</div>
+              <p className="tip-content">{tips[currentTipIndex]}</p>
+              <button className="next-tip-button" onClick={handleNextTip}>
+                Next Tip
+              </button>
+            </div>
+          ) : (
+            <p>Loading self-care tips...</p>
           )}
         </div>
         
