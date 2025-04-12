@@ -1,14 +1,17 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
+from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from datetime import timedelta
-from models import db, User
+from models import User, db
 
 auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
+    
+    # Validate required fields
+    if not all(k in data for k in ('username', 'email', 'password')):
+        return jsonify({'message': 'Missing required fields'}), 400
     
     # Check if user already exists
     if User.query.filter_by(username=data['username']).first():
@@ -18,56 +21,47 @@ def register():
         return jsonify({'message': 'Email already exists'}), 409
     
     # Create new user
-    hashed_password = generate_password_hash(data['password'])
     new_user = User(
         username=data['username'],
-        email=data['email'],
-        password=hashed_password
+        email=data['email']
     )
+    new_user.password = data['password']
     
-    db.session.add(new_user)
-    db.session.commit()
-    
-    return jsonify({'message': 'User registered successfully'}), 201
+    try:
+        db.session.add(new_user)
+        db.session.commit()
+        return jsonify({'message': 'User registered successfully'}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Error: {str(e)}'}), 500
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     
     # Find user by username
-    user = User.query.filter_by(username=data['username']).first()
+    user = User.query.filter_by(username=data.get('username')).first()
     
     # Check if user exists and password is correct
-    if not user or not check_password_hash(user.password, data['password']):
-        return jsonify({'message': 'Invalid credentials'}), 401
+    if not user or not user.verify_password(data.get('password')):
+        return jsonify({'message': 'Invalid username or password'}), 401
     
-    # Create access token
-    access_token = create_access_token(
-        identity=user.id,
-        expires_delta=timedelta(days=1)
-    )
+    # Log in user
+    login_user(user, remember=data.get('remember', False))
+    session.permanent = True
     
     return jsonify({
         'message': 'Login successful',
-        'access_token': access_token,
-        'user': {
-            'id': user.id,
-            'username': user.username,
-            'email': user.email
-        }
+        'user': user.to_dict()
     })
 
+@auth_bp.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({'message': 'Logout successful'})
+
 @auth_bp.route('/me', methods=['GET'])
-@jwt_required()
-def get_user():
-    user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-    
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
-    
-    return jsonify({
-        'id': user.id,
-        'username': user.username,
-        'email': user.email
-    })
+@login_required
+def get_current_user():
+    return jsonify(current_user.to_dict())
