@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
-from models import Mood, db
+from models import Mood
+from database import db
 from datetime import datetime, timedelta
 import logging
 

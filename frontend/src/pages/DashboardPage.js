@@ -1,154 +1,223 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { moodService, selfCareService } from '../services/api';
-import { Line } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-import './DashboardPage.css';
 
-// Register ChartJS components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
-
-const DashboardPage = () => {
-  const [moods, setMoods] = useState([]);
-  const [insights, setInsights] = useState(null);
-  const [tips, setTips] = useState([]);
-  const [currentTipIndex, setCurrentTipIndex] = useState(0);
+const DashboardPage = ({ user }) => {
+  const [moodCount, setMoodCount] = useState(0);
+  const [averageMood, setAverageMood] = useState(0);
+  const [selfCareTips, setSelfCareTips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const [moodsResponse, insightsResponse, tipsResponse] = await Promise.all([
-          moodService.getMoods(),
-          moodService.getInsights(),
-          selfCareService.getTips()
-        ]);
+        setLoading(true);
         
-        setMoods(moodsResponse.data);
-        setInsights(insightsResponse.data);
-        setTips(tipsResponse.data.tips);
-        setError('');
+        // Fetch mood data
+        const moodsResponse = await moodService.getMoods();
+        const moods = moodsResponse.data;
+        setMoodCount(moods.length);
+        
+        if (moods.length > 0) {
+          const total = moods.reduce((sum, mood) => sum + mood.score, 0);
+          setAverageMood(Math.round((total / moods.length) * 10) / 10);
+        }
+        
+        // Fetch self-care tips
+        const tipsResponse = await selfCareService.getTips();
+        setSelfCareTips(tipsResponse.data.tips.slice(0, 3)); // Show only 3 tips
+        
+        setError(null);
       } catch (err) {
+        console.error('Error fetching dashboard data:', err);
         setError('Failed to load dashboard data');
-        console.error(err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchDashboardData();
   }, []);
 
-  // Change tip every 10 seconds
-  useEffect(() => {
-    if (tips.length === 0) return;
-    
-    const interval = setInterval(() => {
-      setCurrentTipIndex(prevIndex => (prevIndex + 1) % tips.length);
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, [tips]);
-
-  // Prepare chart data
-  const chartData = {
-    labels: moods.slice(0, 10).map(mood => {
-      const date = new Date(mood.created_at);
-      return `${date.getMonth() + 1}/${date.getDate()}`;
-    }).reverse(),
-    datasets: [
-      {
-        label: 'Mood Score',
-        data: moods.slice(0, 10).map(mood => mood.score).reverse(),
-        fill: false,
-        borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1
-      }
-    ]
-  };
-
-  const handleNextTip = () => {
-    setCurrentTipIndex(prevIndex => (prevIndex + 1) % tips.length);
+  const getMoodEmoji = (score) => {
+    if (score >= 8) return '😄';
+    if (score >= 6) return '🙂';
+    if (score >= 4) return '😐';
+    if (score >= 2) return '😔';
+    return '😢';
   };
 
   if (loading) {
-    return <div className="loading">Loading dashboard data...</div>;
+    return (
+      <div className="loading">
+        <div className="spinner"></div>
+        Loading your dashboard...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Error</h2>
+          <p className="card-subtitle">{error}</p>
+        </div>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="btn btn-secondary"
+        >
+          🔄 Try Again
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="dashboard-container">
-      <h1>Dashboard</h1>
-      
-      {error && <div className="error-message">{error}</div>}
-      
+    <div className="content">
+      {/* Welcome Section */}
+      <div className="card">
+        <div className="card-header">
+          <h1 className="card-title">Welcome back, {user?.username}! 👋</h1>
+          <p className="card-subtitle">
+            Let's check in on your mental health journey today
+          </p>
+        </div>
+      </div>
+
+      {/* Dashboard Stats */}
       <div className="dashboard-grid">
-        <div className="chart-container">
-          <h2>Recent Mood Trends</h2>
-          {moods.length > 0 ? (
-            <Line data={chartData} />
-          ) : (
-            <p>No mood data available yet. Start tracking your mood!</p>
+        <div className="dashboard-card">
+          <div className="dashboard-icon icon-mood">
+            😊
+          </div>
+          <div className="dashboard-number">{moodCount}</div>
+          <div className="dashboard-label">Mood Entries</div>
+          <p style={{ marginTop: '1rem', color: '#a0aec0', fontSize: '0.9rem' }}>
+            {moodCount === 0 ? 'Start tracking your mood today!' : 'Keep up the great work!'}
+          </p>
+        </div>
+
+        <div className="dashboard-card">
+          <div className="dashboard-icon icon-chat">
+            💬
+          </div>
+          <div className="dashboard-number">
+            {averageMood > 0 ? averageMood : 'N/A'}
+          </div>
+          <div className="dashboard-label">Average Mood</div>
+          {averageMood > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <span style={{ fontSize: '2rem' }}>
+                {getMoodEmoji(averageMood)}
+              </span>
+              <p style={{ color: '#a0aec0', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                {averageMood >= 8 ? 'Excellent!' : 
+                 averageMood >= 6 ? 'Good!' : 
+                 averageMood >= 4 ? 'Okay' : 
+                 averageMood >= 2 ? 'Could be better' : 'Let\'s talk'}
+              </p>
+            </div>
           )}
         </div>
-        
-        <div className="self-care-container">
-          <h2>Self-Care Corner</h2>
-          {tips.length > 0 ? (
-            <div className="tip-card">
-              <div className="tip-icon">💧</div>
-              <p className="tip-content">{tips[currentTipIndex]}</p>
-              <button className="next-tip-button" onClick={handleNextTip}>
-                Next Tip
-              </button>
-            </div>
-          ) : (
-            <p>Loading self-care tips...</p>
-          )}
+
+        <div className="dashboard-card">
+          <div className="dashboard-icon icon-tips">
+            💡
+          </div>
+          <div className="dashboard-number">{selfCareTips.length}</div>
+          <div className="dashboard-label">Self-Care Tips</div>
+          <p style={{ marginTop: '1rem', color: '#a0aec0', fontSize: '0.9rem' }}>
+            Fresh tips to boost your mood
+          </p>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Quick Actions</h2>
+          <p className="card-subtitle">What would you like to do today?</p>
         </div>
         
-        <div className="insights-container">
-          <h2>Insights</h2>
-          {insights ? (
-            <div>
-              <div className="insight-summary">
-                <div className="insight-stat">
-                  <span className="stat-value">{insights.average_mood}</span>
-                  <span className="stat-label">Average Mood</span>
-                </div>
-                <div className="insight-stat">
-                  <span className="stat-value">{insights.total_entries}</span>
-                  <span className="stat-label">Total Entries</span>
-                </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+          <Link to="/mood" className="btn btn-full">
+            📝 Track My Mood
+          </Link>
+          
+          <Link to="/chat" className="btn btn-full">
+            💬 Chat with MindBot
+          </Link>
+          
+          <button 
+            onClick={() => window.location.reload()} 
+            className="btn btn-secondary btn-full"
+          >
+            🔄 Refresh Data
+          </button>
+        </div>
+      </div>
+
+      {/* Self-Care Tips */}
+      {selfCareTips.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Today's Self-Care Tips</h2>
+            <p className="card-subtitle">Small actions for big impact</p>
+          </div>
+          
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {selfCareTips.map((tip, index) => (
+              <div 
+                key={index}
+                style={{
+                  padding: '1rem',
+                  background: 'rgba(102, 126, 234, 0.2)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(102, 126, 234, 0.3)',
+                  borderLeft: '4px solid #667eea'
+                }}
+              >
+                <p style={{ margin: 0, color: '#e2e8f0', lineHeight: '1.6' }}>
+                  💡 {tip}
+                </p>
               </div>
-              
-              <div className="insight-list">
-                {insights.insights.map((insight, index) => (
-                  <div key={index} className={`insight-item ${insight.type}`}>
-                    {insight.message}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p>Track your mood regularly to receive personalized insights.</p>
-          )}
+            ))}
+          </div>
+          
+          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+            <Link to="/mood" className="btn btn-secondary">
+              Get More Tips
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Encouragement */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Remember 🌟</h2>
+          <p className="card-subtitle">
+            Your mental health matters. Every step you take towards self-care is a victory.
+          </p>
+        </div>
+        
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '1rem', 
+          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(159, 122, 234, 0.2))',
+          borderRadius: '12px',
+          border: '1px solid rgba(102, 126, 234, 0.3)'
+        }}>
+          <p style={{ 
+            margin: 0, 
+            fontSize: '1.1rem', 
+            color: '#e2e8f0',
+            fontStyle: 'italic'
+          }}>
+            "The only way to do great work is to love what you do." - Steve Jobs
+          </p>
         </div>
       </div>
     </div>

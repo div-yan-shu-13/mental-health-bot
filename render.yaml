@@ -1,0 +1,49 @@
+{
+  "services": [
+    {
+      "type": "web",
+      "name": "mental-health-bot-backend",
+      "env": "python",
+      "plan": "free",
+      "buildCommand": "pip install -r requirements.txt",
+      "startCommand": "gunicorn app:app",
+      "envVars": [
+        {
+          "key": "PYTHON_VERSION",
+          "value": "3.12"
+        },
+        {
+          "key": "SECRET_KEY",
+          "generateValue": true
+        },
+        {
+          "key": "GROQ_API_KEY",
+          "sync": false
+        },
+        {
+          "key": "DATABASE_URI",
+          "fromDatabase": {
+            "name": "mental-health-db",
+            "property": "connectionString"
+          }
+        }
+      ]
+    },
+    {
+      "type": "web",
+      "name": "mental-health-bot-frontend",
+      "env": "static",
+      "plan": "free",
+      "buildCommand": "npm install && npm run build",
+      "staticPublishPath": "./build"
+    }
+  ],
+  "databases": [
+    {
+      "name": "mental-health-db",
+      "databaseName": "mentalhealth",
+      "user": "mentalhealth_user",
+      "plan": "free"
+    }
+  ]
+}

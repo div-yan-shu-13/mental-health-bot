@@ -1,143 +1,352 @@
 import React, { useState, useEffect } from 'react';
 import { moodService } from '../services/api';
-import './MoodTrackerPage.css';
 
 const MoodTrackerPage = () => {
-  const [moodScore, setMoodScore] = useState(5);
+  const [moodScore, setMoodScore] = useState(null);
   const [notes, setNotes] = useState('');
   const [moods, setMoods] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('');
 
-  // Fetch existing mood entries
   useEffect(() => {
-    const fetchMoods = async () => {
-      try {
-        const response = await moodService.getMoods();
-        setMoods(response.data);
-        setError('');
-      } catch (err) {
-        setError('Failed to load mood entries');
-        console.error('Error fetching moods:', err.response || err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchMoods();
   }, []);
 
-  // Handle mood submission
+  const fetchMoods = async () => {
+    try {
+      setLoading(true);
+      const response = await moodService.getMoods();
+      setMoods(response.data);
+    } catch (error) {
+      console.error('Error fetching moods:', error);
+      setMessage('Failed to load mood history');
+      setMessageType('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMoodSelect = (score) => {
+    setMoodScore(score);
+    setMessage('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
-    setError('');
-    setSuccess('');
+    
+    if (!moodScore) {
+      setMessage('Please select a mood score');
+      setMessageType('error');
+      return;
+    }
 
     try {
-      const response = await moodService.addMood(moodScore, notes);
-      setMoods([response.data, ...moods]);
+      setSubmitting(true);
+      await moodService.addMood(moodScore, notes);
+      
+      setMessage('Mood recorded successfully! 🎉');
+      setMessageType('success');
+      setMoodScore(null);
       setNotes('');
-      setSuccess('Mood logged successfully!');
+      
+      // Refresh mood list
+      fetchMoods();
       
       // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError('Failed to log mood');
-      console.error(err);
+      setTimeout(() => {
+        setMessage('');
+        setMessageType('');
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error adding mood:', error);
+      setMessage('Failed to record mood. Please try again.');
+      setMessageType('error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Get emoji based on mood score
   const getMoodEmoji = (score) => {
-    if (score <= 2) return '😢';
-    if (score <= 4) return '😕';
-    if (score <= 6) return '😐';
-    if (score <= 8) return '🙂';
-    return '😄';
+    const emojis = ['😢', '😔', '😐', '🙂', '😄'];
+    const index = Math.floor((score - 1) / 2);
+    return emojis[Math.min(index, emojis.length - 1)];
+  };
+
+  const getMoodLabel = (score) => {
+    if (score >= 9) return 'Excellent';
+    if (score >= 7) return 'Great';
+    if (score >= 5) return 'Good';
+    if (score >= 3) return 'Okay';
+    if (score >= 1) return 'Poor';
+    return 'Terrible';
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
-    <div className="mood-tracker-container">
-      <h1>Mood Tracker</h1>
-      
-      <div className="mood-form-container">
-        <h2>How are you feeling today?</h2>
+    <div className="content">
+      {/* Header */}
+      <div className="card">
+        <div className="card-header">
+          <h1 className="card-title">Track Your Mood 😊</h1>
+          <p className="card-subtitle">
+            How are you feeling right now? Take a moment to check in with yourself.
+          </p>
+        </div>
+      </div>
+
+      {/* Mood Selection Form */}
+      <div className="mood-form">
+        <h2 style={{ marginBottom: '1.5rem', color: '#e2e8f0', textAlign: 'center' }}>
+          Rate your current mood (1-10)
+        </h2>
         
-        {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
-        
-        <form onSubmit={handleSubmit}>
-          <div className="mood-slider-container">
-            <div className="mood-emoji">{getMoodEmoji(moodScore)}</div>
-            <input
-              type="range"
-              min="1"
-              max="10"
-              value={moodScore}
-              onChange={(e) => setMoodScore(parseInt(e.target.value))}
-              className="mood-slider"
-            />
-            <div className="mood-scale">
-              <span>1</span>
-              <span>2</span>
-              <span>3</span>
-              <span>4</span>
-              <span>5</span>
-              <span>6</span>
-              <span>7</span>
-              <span>8</span>
-              <span>9</span>
-              <span>10</span>
+        <div className="mood-scale">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
+            <div 
+              key={score} 
+              className="mood-option"
+              onClick={() => handleMoodSelect(score)}
+            >
+              <div 
+                className={`mood-circle mood-${score} ${moodScore === score ? 'selected' : ''}`}
+                style={{
+                  transform: moodScore === score ? 'scale(1.1)' : 'scale(1)',
+                  boxShadow: moodScore === score ? '0 8px 25px rgba(0,0,0,0.5)' : 'none'
+                }}
+              >
+                {score}
+              </div>
+              <div className="mood-label">
+                {score === 1 ? 'Terrible' : 
+                 score === 5 ? 'Okay' : 
+                 score === 10 ? 'Amazing' : ''}
+              </div>
             </div>
-          </div>
-          
+          ))}
+        </div>
+
+        <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="notes">Notes (optional)</label>
+            <label className="form-label">
+              💭 Additional Notes (Optional)
+            </label>
             <textarea
-              id="notes"
+              className="form-input form-textarea"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="What's on your mind today?"
-              rows="4"
-            ></textarea>
+              placeholder="What's on your mind? Any specific thoughts or feelings you'd like to share?"
+            />
           </div>
-          
-          <button type="submit" disabled={submitting}>
-            {submitting ? 'Logging...' : 'Log Mood'}
+
+          {message && (
+            <div className={messageType === 'success' ? 'success-message' : 'error-message'}>
+              {message}
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            className="btn btn-full"
+            disabled={!moodScore || submitting}
+          >
+            {submitting ? (
+              <>
+                <div className="spinner" style={{ width: '20px', height: '20px', margin: '0 0.5rem 0 0' }}></div>
+                Recording Mood...
+              </>
+            ) : (
+              '📝 Record My Mood'
+            )}
           </button>
         </form>
       </div>
-      
-      <div className="mood-history-container">
-        <h2>Mood History</h2>
-        
+
+      {/* Mood History */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Your Mood Journey 📈</h2>
+          <p className="card-subtitle">
+            Track your emotional patterns over time
+          </p>
+        </div>
+
         {loading ? (
-          <div className="loading">Loading mood history...</div>
+          <div className="loading">
+            <div className="spinner"></div>
+            Loading your mood history...
+          </div>
         ) : moods.length === 0 ? (
-          <p>No mood entries yet. Start tracking your mood!</p>
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '3rem',
+            color: '#a0aec0'
+          }}>
+            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📝</div>
+            <h3 style={{ marginBottom: '1rem', color: '#e2e8f0' }}>
+              No mood entries yet
+            </h3>
+            <p>Start tracking your mood to see your emotional journey!</p>
+          </div>
         ) : (
-          <div className="mood-entries">
-            {moods.map((mood) => (
-              <div key={mood.id} className="mood-entry">
-                <div className="mood-entry-header">
-                  <div className="mood-entry-score">
-                    <span className="mood-emoji">{getMoodEmoji(mood.score)}</span>
-                    <span className="score-value">{mood.score}/10</span>
-                  </div>
-                  <div className="mood-entry-date">
-                    {new Date(mood.created_at).toLocaleDateString()} at {new Date(mood.created_at).toLocaleTimeString()}
-                  </div>
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {moods.slice(0, 10).map((mood) => (
+              <div 
+                key={mood.id}
+                style={{
+                  padding: '1.5rem',
+                  background: 'rgba(26, 32, 44, 0.8)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(74, 85, 104, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem'
+                }}
+              >
+                <div 
+                  style={{
+                    width: '50px',
+                    height: '50px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: '600',
+                    fontSize: '1.2rem',
+                    background: `linear-gradient(135deg, 
+                      ${mood.score >= 8 ? '#48bb78' : 
+                        mood.score >= 6 ? '#38b2ac' : 
+                        mood.score >= 4 ? '#ecc94b' : 
+                        mood.score >= 2 ? '#ed8936' : '#e53e3e'}, 
+                      ${mood.score >= 8 ? '#38a169' : 
+                        mood.score >= 6 ? '#319795' : 
+                        mood.score >= 4 ? '#d69e2e' : 
+                        mood.score >= 2 ? '#dd6b20' : '#c53030'})`
+                  }}
+                >
+                  {mood.score}
                 </div>
-                {mood.notes && <div className="mood-entry-notes">{mood.notes}</div>}
+                
+                <div style={{ flex: 1 }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    marginBottom: '0.5rem'
+                  }}>
+                    <span style={{ fontSize: '1.5rem' }}>
+                      {getMoodEmoji(mood.score)}
+                    </span>
+                    <span style={{ 
+                      fontWeight: '600', 
+                      color: '#e2e8f0',
+                      fontSize: '1.1rem'
+                    }}>
+                      {getMoodLabel(mood.score)} ({mood.score}/10)
+                    </span>
+                  </div>
+                  
+                  {mood.notes && (
+                    <p style={{ 
+                      margin: 0, 
+                      color: '#a0aec0',
+                      fontStyle: 'italic'
+                    }}>
+                      "{mood.notes}"
+                    </p>
+                  )}
+                </div>
+                
+                <div style={{ 
+                  color: '#a0aec0', 
+                  fontSize: '0.9rem',
+                  textAlign: 'right'
+                }}>
+                  {formatDate(mood.created_at)}
+                </div>
               </div>
             ))}
+            
+            {moods.length > 10 && (
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <p style={{ color: '#a0aec0' }}>
+                  Showing last 10 entries. You have {moods.length} total mood records!
+                </p>
+              </div>
+            )}
           </div>
         )}
+      </div>
+
+      {/* Encouragement */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Why Track Your Mood? 🤔</h2>
+          <p className="card-subtitle">
+            Understanding your emotional patterns can lead to better mental health
+          </p>
+        </div>
+        
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+          gap: '1.5rem' 
+        }}>
+          <div style={{
+            padding: '1.5rem',
+            background: 'rgba(102, 126, 234, 0.2)',
+            borderRadius: '12px',
+            border: '1px solid rgba(102, 126, 234, 0.3)',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📊</div>
+            <h4 style={{ marginBottom: '0.5rem', color: '#e2e8f0' }}>Pattern Recognition</h4>
+            <p style={{ margin: 0, color: '#a0aec0', fontSize: '0.9rem' }}>
+              Identify triggers and patterns in your emotional well-being
+            </p>
+          </div>
+          
+          <div style={{
+            padding: '1.5rem',
+            background: 'rgba(72, 187, 120, 0.2)',
+            borderRadius: '12px',
+            border: '1px solid rgba(72, 187, 120, 0.3)',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🎯</div>
+            <h4 style={{ marginBottom: '0.5rem', color: '#e2e8f0' }}>Goal Setting</h4>
+            <p style={{ margin: 0, color: '#a0aec0', fontSize: '0.9rem' }}>
+              Set and track progress toward your mental health goals
+            </p>
+          </div>
+          
+          <div style={{
+            padding: '1.5rem',
+            background: 'rgba(237, 137, 54, 0.2)',
+            borderRadius: '12px',
+            border: '1px solid rgba(237, 137, 54, 0.3)',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>💪</div>
+            <h4 style={{ marginBottom: '0.5rem', color: '#e2e8f0' }}>Self-Awareness</h4>
+            <p style={{ margin: 0, color: '#a0aec0', fontSize: '0.9rem' }}>
+              Build better understanding of your emotional landscape
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

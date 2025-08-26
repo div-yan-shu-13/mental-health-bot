@@ -1,7 +1,7 @@
 from flask_login import UserMixin
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-from app import db, login_manager
+from database import db
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -47,7 +47,3 @@ class Mood(db.Model):
             'created_at': self.created_at.isoformat(),
             'user_id': self.user_id
         }
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))

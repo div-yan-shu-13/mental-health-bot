@@ -1,20 +1,14 @@
 from flask import Flask, session
-from flask_migrate import Migrate
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
 from flask import jsonify
 from flask_login import login_required
+from database import init_app
 
 # Load environment variables
 load_dotenv()
-
-# Initialize extensions first (without app)
-db = SQLAlchemy()
-login_manager = LoginManager()
 
 def create_app():
     app = Flask(__name__)
@@ -26,19 +20,18 @@ def create_app():
     app.config['SESSION_TYPE'] = 'filesystem'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
     
-    # Configure CORS - Allow credentials for session cookies
+
+    # Production CORS configuration
+    cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
     CORS(app, resources={r"/api/*": {
-        "origins": "http://localhost:3000",
+        "origins": cors_origins,
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True  # Important for cookies
+        "supports_credentials": True
     }})
 
-    # Initialize extensions with app
-    db.init_app(app)
-    migrate = Migrate(app, db)   
-    login_manager.init_app(app)
-    login_manager.login_view = 'auth.login'
+    # Initialize all extensions
+    init_app(app)
     
     # Register blueprints
     from auth import auth_bp
@@ -50,6 +43,7 @@ def create_app():
     app.register_blueprint(chatbot_bp, url_prefix='/api/chatbot')
     
     # Create database tables
+    from database import db
     with app.app_context():
         db.create_all()
     
